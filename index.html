@@ -516,7 +516,7 @@ footer .langs{font-family:var(--mono);font-size:12px;letter-spacing:.06em}
     fetch(ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok && d.ok, d: d, s: r.status }; }); })
       .then(function (res) {
-        if (res.ok) { form.reset(); say("Thank you — your message is on its way. I'll be in touch soon.", "ok"); }
+        if (res.ok) { if (window.siteTrack) window.siteTrack("inquiry_submit"); form.reset(); say("Thank you — your message is on its way. I'll be in touch soon.", "ok"); }
         else if (res.s === 429) { say("Too many messages in a short time. Please try again in a few minutes.", "err"); }
         else { say((res.d && res.d.error) || "Something went wrong. Please email krexie@hotmail.com directly.", "err"); }
       })
@@ -526,5 +526,47 @@ footer .langs{font-family:var(--mono);font-size:12px;letter-spacing:.06em}
 })();
 </script>
 
+<script>
+/* Cookieless analytics for sites that report to the Site Console.
+   Sends: pageview, section_view (each <section id> once per page load, when it crosses mid-screen),
+   contact_open (first interaction with the contact form), inquiry_submit (call window.siteTrack("inquiry_submit")). */
+(function () {
+  var ENDPOINT = "https://rex-console.vercel.app/api/events";
+  function send(type, extra) {
+    try {
+      var payload = { type: type, path: location.pathname };
+      for (var k in extra || {}) if (extra[k]) payload[k] = extra[k];
+      var body = JSON.stringify(payload);
+      if (navigator.sendBeacon && navigator.sendBeacon(ENDPOINT, new Blob([body], { type: "text/plain" }))) return;
+      fetch(ENDPOINT, { method: "POST", body: body, keepalive: true, headers: { "Content-Type": "text/plain" } });
+    } catch (e) {}
+  }
+  window.siteTrack = send;
+
+  var refHost = "";
+  try { if (document.referrer) { var r = new URL(document.referrer); if (r.host !== location.host) refHost = r.host; } } catch (e) {}
+  var params = new URLSearchParams(location.search);
+  send("pageview", { referrer: refHost, utm_source: params.get("utm_source") || "" });
+
+  var seen = {};
+  function watchSections() {
+    if (!("IntersectionObserver" in window)) return;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        var id = e.target.id;
+        if (e.isIntersecting && !seen[id]) { seen[id] = 1; send("section_view", { section: id }); io.unobserve(e.target); }
+      });
+    }, { rootMargin: "-45% 0px -45% 0px" });
+    document.querySelectorAll("section[id]").forEach(function (s) { io.observe(s); });
+  }
+  var opened = false;
+  document.addEventListener("focusin", function (e) {
+    if (!opened && e.target && e.target.closest && e.target.closest("#contact form")) { opened = true; send("contact_open"); }
+  });
+  if (document.readyState === "complete") setTimeout(watchSections, 300);
+  else window.addEventListener("load", function () { setTimeout(watchSections, 300); });
+})();
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>
