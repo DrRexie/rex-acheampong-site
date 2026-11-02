@@ -214,6 +214,25 @@ footer{background:#060E20;color:var(--on-ink-muted);font-size:13.5px}
 footer .wrap{display:flex;flex-wrap:wrap;gap:12px 28px;justify-content:space-between;padding-block:28px}
 footer .langs{font-family:var(--mono);font-size:12px;letter-spacing:.06em}
 @media (max-width:860px){.contact .wrap{grid-template-columns:1fr;gap:36px}}
+/* inquiry form */
+.contact-side{display:grid;gap:20px;min-width:0}
+.inquiry{display:grid;gap:16px}
+.inquiry h3{font-size:24px;color:#fff}
+.inquiry .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.inquiry label{display:grid;gap:7px;font:500 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--on-ink-muted)}
+.inquiry label .opt{letter-spacing:.04em;text-transform:none}
+.inquiry input,.inquiry select,.inquiry textarea{width:100%;font:400 16px/1.4 var(--body);color:#fff;background:var(--ink);border:1px solid rgba(255,255,255,.22);border-radius:10px;padding:12px 14px;min-height:46px}
+.inquiry select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,#9DAAC4 50%),linear-gradient(135deg,#9DAAC4 50%,transparent 50%);background-position:calc(100% - 20px) 50%,calc(100% - 14px) 50%;background-size:6px 6px;background-repeat:no-repeat;padding-right:36px}
+.inquiry select option{color:var(--text);background:#fff}
+.inquiry textarea{min-height:130px;resize:vertical}
+.inquiry input:focus,.inquiry select:focus,.inquiry textarea:focus{outline:none;border-color:var(--accent-soft);box-shadow:0 0 0 3px rgba(240,106,95,.25)}
+.inquiry .hp{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
+.inquiry button{justify-self:start;cursor:pointer;border:0;min-height:48px}
+.inquiry button[disabled]{opacity:.6;cursor:wait}
+.inquiry .status{font-size:15px;min-height:1.4em;color:#DCE3F0}
+.inquiry .status.ok{color:#8FE0B0}
+.inquiry .status.err{color:var(--accent-soft)}
+@media (max-width:520px){.inquiry .two{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -422,11 +441,51 @@ footer .langs{font-family:var(--mono);font-size:12px;letter-spacing:.06em}
       <p class="lede">I'm available for advisory and consulting work, speaking, and research collaboration in digital health, clinical analytics and AI.</p>
       <div class="ways"><span>Digital health and AI strategy advisory</span><span>EHR, HIE and analytics implementation</span><span>Research design and statistical consulting</span><span>Keynotes and panels on AI in healthcare</span></div>
     </div>
+    <div class="contact-side">
+    <form class="card-contact inquiry" id="inquiry-form" novalidate>
+      <h3>Send a message</h3>
+      <div class="two">
+        <label>Name<input name="name" autocomplete="name" required maxlength="200"></label>
+        <label>Email<input name="email" type="email" autocomplete="email" required maxlength="320"></label>
+      </div>
+      <label>Organization <span class="opt">(optional)</span><input name="organization" autocomplete="organization" maxlength="200"></label>
+      <div class="two">
+        <label>I am with a…
+          <select name="audience" required>
+            <option value="">Choose one</option>
+            <option value="hospital">Hospital or clinical network</option>
+            <option value="government">Government or development partner</option>
+            <option value="research">Research institution</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>Interested in
+          <select name="service">
+            <option value="">Not sure yet</option>
+            <option>EHR selection &amp; migration</option>
+            <option>CMS quality reporting</option>
+            <option>Clinical operations dashboards</option>
+            <option>eHealth architecture</option>
+            <option>HIE architecture &amp; FHIR integration</option>
+            <option>Data protection &amp; ethical AI policy</option>
+            <option>Study design</option>
+            <option>Predictive modeling</option>
+            <option>HIPAA / IRB / GDPR workflows</option>
+            <option>Other</option>
+          </select>
+        </label>
+      </div>
+      <label>Message<textarea name="message" required maxlength="5000"></textarea></label>
+      <div class="hp" aria-hidden="true"><label>Website<input name="website" tabindex="-1" autocomplete="off"></label></div>
+      <button class="btn btn-primary" type="submit">Send message <span class="arrow">→</span></button>
+      <p class="status" id="inquiry-status" role="status" aria-live="polite"></p>
+    </form>
     <div class="card-contact">
       <div class="row"><p class="k">Email</p><div class="v"><a href="mailto:krexie@hotmail.com">krexie@hotmail.com</a></div></div>
       <div class="row"><p class="k">LinkedIn</p><div class="v"><a href="https://www.linkedin.com/in/rex-acheampong-phd-6811442b" target="_blank" rel="noopener">Rex Acheampong, PhD ↗</a></div></div>
       <div class="row"><p class="k">Company</p><div class="v"><a href="https://strategicehealthsolutions.com/" target="_blank" rel="noopener">strategicehealthsolutions.com ↗</a></div></div>
       <div class="row"><p class="k">Based in</p><div class="v">New Jersey, USA · working with Accra, Ghana</div></div>
+    </div>
     </div>
   </div>
 </section>
@@ -439,6 +498,33 @@ footer .langs{font-family:var(--mono);font-size:12px;letter-spacing:.06em}
   </div>
 </footer>
 
+<script>
+(function () {
+  var ENDPOINT = "https://rex-console.vercel.app/api/inquiries";
+  var form = document.getElementById("inquiry-form");
+  var status = document.getElementById("inquiry-status");
+  if (!form) return;
+  function say(text, kind) { status.textContent = text; status.className = "status" + (kind ? " " + kind : ""); }
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (!form.checkValidity()) { form.reportValidity(); return; }
+    var btn = form.querySelector("button[type=submit]");
+    var body = {};
+    new FormData(form).forEach(function (v, k) { body[k] = String(v).trim(); });
+    btn.disabled = true;
+    say("Sending…");
+    fetch(ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok && d.ok, d: d, s: r.status }; }); })
+      .then(function (res) {
+        if (res.ok) { form.reset(); say("Thank you — your message is on its way. I'll be in touch soon.", "ok"); }
+        else if (res.s === 429) { say("Too many messages in a short time. Please try again in a few minutes.", "err"); }
+        else { say((res.d && res.d.error) || "Something went wrong. Please email krexie@hotmail.com directly.", "err"); }
+      })
+      .catch(function () { say("Network error. Please email krexie@hotmail.com directly.", "err"); })
+      .then(function () { btn.disabled = false; });
+  });
+})();
+</script>
 
 </body>
 </html>
