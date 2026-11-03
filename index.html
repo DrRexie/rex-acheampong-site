@@ -529,7 +529,8 @@ footer .langs{font-family:var(--mono);font-size:12px;letter-spacing:.06em}
 <script>
 /* Cookieless analytics for sites that report to the Site Console.
    Sends: pageview, section_view (each <section id> once per page load, when it crosses mid-screen),
-   contact_open (first interaction with the contact form), inquiry_submit (call window.siteTrack("inquiry_submit")). */
+   contact_open (first interaction with the contact form), inquiry_submit (call window.siteTrack("inquiry_submit")),
+   engagement (active seconds on the page and per section, sent when the page is hidden). */
 (function () {
   var ENDPOINT = "https://rex-console.vercel.app/api/events";
   function send(type, extra) {
@@ -563,6 +564,33 @@ footer .langs{font-family:var(--mono);font-size:12px;letter-spacing:.06em}
   document.addEventListener("focusin", function (e) {
     if (!opened && e.target && e.target.closest && e.target.closest("#contact form")) { opened = true; send("contact_open"); }
   });
+  // Engaged time: a second counts only while the tab is visible and the visitor acted in the last 45s;
+  // the section crossing mid-screen gets that second too. Sent whenever the page is hidden.
+  var active = 0, secs = {}, lastInput = Date.now();
+  ["scroll", "mousemove", "keydown", "touchstart", "click"].forEach(function (ev) {
+    window.addEventListener(ev, function () { lastInput = Date.now(); }, { passive: true });
+  });
+  setInterval(function () {
+    if (document.visibilityState !== "visible" || Date.now() - lastInput > 45000) return;
+    active++;
+    var mid = innerHeight / 2, list = document.querySelectorAll("section[id]");
+    for (var i = 0; i < list.length; i++) {
+      var r = list[i].getBoundingClientRect();
+      if (r.top <= mid && r.bottom >= mid) { secs[list[i].id] = (secs[list[i].id] || 0) + 1; break; }
+    }
+  }, 1000);
+  function flush() {
+    if (active < 1) return;
+    try {
+      var body = JSON.stringify({ type: "engagement", path: location.pathname, seconds: Math.min(active, 3600), sections: secs });
+      if (!(navigator.sendBeacon && navigator.sendBeacon(ENDPOINT, new Blob([body], { type: "text/plain" }))))
+        fetch(ENDPOINT, { method: "POST", body: body, keepalive: true, headers: { "Content-Type": "text/plain" } });
+    } catch (e) {}
+    active = 0; secs = {};
+  }
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") flush(); });
+  window.addEventListener("pagehide", flush);
+
   if (document.readyState === "complete") setTimeout(watchSections, 300);
   else window.addEventListener("load", function () { setTimeout(watchSections, 300); });
 })();
